@@ -13,51 +13,42 @@ export default async function login(args, config) {
   const { debug } = args;
 
   let email;
-  let password;
   let emailIsValid = false;
 
-  // if --email and --password args available
-  if(!args.email && !args.password){
-    do {
-      try {
-        email = await promptEmail();
-      } catch (err) {
-        let erase = '';
-        if (err.message.includes('Aborted')) {
-          // no need to keep the prompt if the user `ctrl+c`ed
-          erase = eraseLines(2);
-        }
-        console.log(erase + err.message);
+  do {
+    try {
+      email = await promptEmail();
+    } catch (err) {
+      let erase = '';
+      if (err.message.includes('Aborted')) {
+        // no need to keep the prompt if the user `ctrl+c`ed
+        erase = eraseLines(2);
+      }
+      console.log(erase + err.message);
+      return false;
+    }
+
+    emailIsValid = validateEmail(email);
+    if ( ! emailIsValid) {
+      // let's erase the `> Enter email [...]`
+      // we can't use `console.log()` because it appends a `\n`
+      // we need this check because `email-prompt` doesn't print
+      // anything if there's no TTY
+      process.stdout.write(eraseLines(2));
+    }
+  } while ( ! emailIsValid);
+
+  const { password } = await prompt({
+    name: 'password',
+    type: 'password',
+    message: 'Enter your password:',
+    validate(input) {
+      if (input.length === 0) {
         return false;
       }
-
-      emailIsValid = validateEmail(email);
-      if ( ! emailIsValid) {
-        // let's erase the `> Enter email [...]`
-        // we can't use `console.log()` because it appends a `\n`
-        // we need this check because `email-prompt` doesn't print
-        // anything if there's no TTY
-        process.stdout.write(eraseLines(2));
-      }
-    } while ( ! emailIsValid);
-
-    await prompt({
-      name: 'password',
-      type: 'password',
-      message: 'Enter your password:',
-      validate(input) {
-        if (input.length === 0) {
-          return false;
-        }
-        password = input;
-        return true;
-      }
-    });
-
-  }else{
-    email = args.email;
-    password = args.password;
-  }
+      return true;
+    }
+  });
 
   try {
     const { api_token } = await retry(async bail => {
